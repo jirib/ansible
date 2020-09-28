@@ -1,0 +1,28 @@
+---
+
+# individual php-fpm instance removal
+
+- name: Stop and disable PHP-FPM instance service
+  service:
+    name: php-fpm@{{ _website }}.service
+    enabled: false
+    state: stopped
+
+- name: Get list of individual PHP website logs
+  find:
+    paths: /var/log/php-fpm
+    file_type: file
+    patterns: >-
+      {{ '%s-slow.log,%s-access.log,%s-error.log'
+      | format(_website,_website,_website)
+      }}
+  register: _website_logs
+
+- name: Remove individual PHP website configuration and logs
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ (_website_logs | json_query('files[*].path') | default([])) +
+    [ '/etc/sysconfig/php-fpm-%s' | format(_website) ] +
+    [ '%s/%s.conf' | format(php_fpm_sites_conf_dir, _website) ] }}

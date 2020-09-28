@@ -1,0 +1,12 @@
+---
+
+- name: Uninstall nginx package
+  package:
+    name: nginx
+    state: absent
+    enabled: false
+
+- name: Remove nginx configuration
+  file:
+    path: /etc/nginx
+    state: absent

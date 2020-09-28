@@ -1,0 +1,32 @@
+---
+
+# defaults file for sshd, if commented it sticks to default values in
+# /etc/ssh/sshd_config
+
+#sshd_authorizedkeyfile: .ssh/authorized_keys
+#sshd_passwordauthentication: 'no'
+
+# for IPA enrolled hosts, set this to 'yes'
+#sshd_gssapiauthentication: 'no'
+#sshd_permitrootlogin: 'yes'
+
+sshd_usedns: 'no'
+sshd_x11forwarding: 'no'
+
+# for IPA enrolled hosts
+#sshd_gssapiauthentication: 'yes'
+#sshd_passwordauthentication: 'yes'
+
+# sshd_config(5): 'If a key supplied by AuthorizedKeysCommand does not
+# successfully authenticate and authorize the user then public key
+# authentication continues using the usual AuthorizedKeysFile files',
+# thus this is safe default even ec2-connect or SSSd are not present
+sshd_extra_parameters: |-
+  Match user *,!ec2-user
+    AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+    AuthorizedKeysCommandUser nobody
+  Match user ec2-user
+    AuthorizedKeysCommand /opt/aws/bin/eic_run_authorized_keys %u %f
+    AuthorizedKeysCommandUser ec2-instance-connect
+  AuthorizedKeysCommand /usr/bin/sss_ssh_authorizedkeys
+  AuthorizedKeysCommandUser nobody

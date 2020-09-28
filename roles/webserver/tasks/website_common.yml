@@ -1,0 +1,55 @@
+---
+
+# tasks common to websites independent of webserver type
+
+- name: Creating directory structure
+  file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    state: "{{ item. state }}"
+  loop:
+    - path: "{{ webserver_www_sites_dir }}"
+      owner: root
+      group: root
+      mode: "0755"
+      state: directory
+    - path: >-
+        {{ '%s/%s/%s/html'
+          | format(
+            webserver_www_users_dir,
+            webserver_website.user | default('root'),
+            webserver_website.name)
+        }}
+      owner: "{{ webserver_website.user | default('root') }}"
+      group: "{{ webserver_website.user | default('root') }}"
+      mode: "0755"
+      state: directory
+
+# coreutils >= 8.16 supports relative option in ln command but let's try to be
+# idempotent
+- name: "Get relative path for symlink in {{ webserver_www_sites_dir }}"
+  command: >-
+    python -c "import os.path; print os.path.relpath(
+    '{{ _destpath }}', '{{ _srcpath }}')"
+  vars:
+    _destpath: >-
+      {{ '%s/%s/%s' |
+        format(
+          webserver_www_users_dir,
+          webserver_website.user | default('root'),
+          webserver_website.name
+        )
+      }}
+    _srcpath: "{{ webserver_www_sites_dir }}"
+  register: _relpath
+  check_mode: false
+  changed_when: false
+
+- name: "Creating symlink to {{ webserver_www_sites_dir }}"
+  file:
+    src: "{{ _relpath.stdout }}"
+    dest: "{{ webserver_www_sites_dir }}/{{ webserver_website.name }}"
+    state: link
+  when: not ansible_check_mode

@@ -1,0 +1,16 @@
+---
+
+- name: Run Vuls scan against a list of targets
+  hosts: "{{ target | default('all') }}"
+  become: false
+  vars:
+    vuls_server_url: "http://{{ groups['app_vuls_server'] | first }}:5515/vuls"
+    vuls_scan_metrics_host: "{{ groups['app_vuls_server'] | first }}"
+    vuls_scan_save_metrics: true
+
+  tasks:
+
+    - name: Import scan playbook from vuls role
+      import_role:
+        name: vuls
+        tasks_from: scan

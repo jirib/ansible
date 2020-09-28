@@ -1,0 +1,22 @@
+---
+
+- &container_images
+  name: Pull containers images locally
+  docker_image:
+    name: "{{ item }}"
+    source: pull
+    state: "{{ vuls_state | default('present') }}"
+  loop:
+    - vuls/go-cve-dictionary # tool to build a local copy of the NVD
+    - vuls/goval-dictionary  # tool to build a local copy of the OVAL
+    - vuls/gost              # tool to build a local copy of a security tracker
+    - vuls/go-exploitdb      # too to search exploits in some expoits databases
+    - vuls/go-msfdb          # tool to search CVEs in Metasploit-Framework
+    - vuls/vuls              # agentless vulnerability scanner
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *container_images
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0

@@ -1,0 +1,110 @@
+---
+
+# vuls as a service
+
+# vuls config is toml based, thus use `yj' binary to convert from yaml to toml
+- name: Vuls config.toml
+  block:
+
+    - name: Check if yj binary is present
+      shell: command -v yj
+      args:
+        warn: false
+      register: _command
+      ignore_errors: true
+      check_mode: false
+      delegate_to: localhost
+      become: false
+
+    # let's not mess with package manager, download binary to a temporary file
+    # do not use tempfile as usual /tmp could be mounted with noexec option
+    - name: Download yj binary
+      get_url:
+        url: "https://github.com/sclevine/yj/releases/latest/download/yj-linux"
+        dest: "{{ '%s/.ansible/tmp/yj' | format(lookup('env', 'HOME')) }}"
+        mode: 0755
+      when: _command.rc != 0
+      check_mode: false
+      delegate_to: localhost
+      become: false
+
+    - name: Set path to yj binary
+      set_fact:
+        _yj: >-
+          {{ (_command.rc==0)
+          | ternary(_command.stdout, '%s/.ansible/tmp/yj'
+          | format(lookup('env', 'HOME')))
+          }}
+
+    # empty line is there by purpose, ie. to have newline character
+    - name: Save Vuls config.toml
+      shell:
+        cmd: |
+          {{ _yj }} -yt <<EOF
+          {{ vuls_config }}
+          
+          EOF
+      args:
+        warn: false
+      register: _toml
+      check_mode: false
+      delegate_to: localhost
+      become: false
+
+    - name: Deploy Vuls config.toml
+      copy:
+         dest: "{{ vuls_data_directory }}/config.toml"
+         content: "{{ _toml.stdout }}"
+
+  always:
+
+    - name: Remove download yj binary
+      file:
+        path: "{{ '%s/.ansible/tmp/yj' | format(lookup('env', 'HOME')) }}"
+        state: absent
+      check_mode: false
+      when: "'.ansible/tmp/yj' in _yj"
+      delegate_to: localhost
+      become: false
+
+  when: vuls_config | default({}) | length > 0
+
+- &vuls_scan
+  name: Setup Vuls as a service
+  docker_compose:
+    project_name: vuls
+    definition:
+      vuls_vuls:
+        image: vuls/vuls
+        command: "server {{ vuls_server_options }}"
+        ports:
+          - "{{ vuls_server_port }}:{{ vuls_server_port }}"
+        volumes: "{{ _volumes }}"
+        environment:
+          TZ: Europe/Prague
+        dns: "{{ vuls_dns_servers | default(None) | default(omit) }}"
+    recreate: always
+    state: "{{ vuls_state | default('present') }}"
+    remove_images: local
+  register: __vuls_vuls
+  vars:
+    _volumes: &_volumes >-
+      {{ [ '%s:%s' | format(vuls_data_directory, '/vuls'),
+      '%s:%s' | format(vuls_vuls_log_directory, '/var/log/vuls'),
+      '/etc/localtime:/etc/localtime:ro']
+      }}
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *vuls_scan
+  register: __vuls_vuls_
+  vars:
+    _volumes: *_volumes
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+- name: Check that Vuls server is running with port check
+  wait_for:
+    port: "{{ vuls_server_port }}"
+    delay: 5
+    timeout: 15

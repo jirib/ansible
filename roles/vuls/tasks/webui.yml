@@ -1,0 +1,36 @@
+---
+
+# vuls repo as service
+
+- &vuls_repo
+  name: Vuls web UI as service
+  docker_compose:
+    project_name: vuls
+    definition:
+      vuls_webui:
+        image: vuls/vulsrepo
+        command: "{{ vuls_webui_options }}"
+        ports:
+          - "{{ vuls_webui_port }}:{{ vuls_webui_port }}"
+        volumes:
+          - "{{ vuls_data_directory }}:/vuls"
+        environment:
+          TZ: Europe/Prague
+        dns: "{{ vuls_dns_servers | default(None) | default(omit) }}"
+    state: "{{ vuls_state | default('present') }}"
+    remove_images: local
+  register: __vuls_webui
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *vuls_repo
+  register: __vuls_webui_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+- name: Check that Vuls web UI is running with port check
+  wait_for:
+    port: "{{ vuls_webui_port }}"
+    delay: 5
+    timeout: 300

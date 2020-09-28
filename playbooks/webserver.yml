@@ -1,0 +1,11 @@
+---
+
+- name: Run webserver
+  hosts: "{{ target | default('role_webserver') }}"
+  become: yes
+
+  tasks:
+
+    - name: Run webserver role
+      import_role:
+        name: webserver

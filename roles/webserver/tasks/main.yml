@@ -1,0 +1,75 @@
+---
+
+# tasks file for webserver
+
+- name: Include variables
+  include_vars:
+    file: "{{ webserver_daemon }}.yml"
+
+- name: Create webserver and websites block
+  block:
+
+    - name: "Include create task file for {{ webserver_daemon }}"
+      include_tasks: create_{{ webserver_daemon }}.yml
+
+    - name: Include create_website.yml
+      include_tasks: create_website.yml
+      loop: "{{ webserver_websites | default([]) }}"
+      loop_control:
+        loop_var: webserver_website
+
+    - name: Get list of currently configured nginx websites
+      find:
+        paths: >-
+          {{ lookup('vars',
+          'webserver_' + webserver_daemon + '_conf_sites_dir')
+          }}
+        file_type: file
+        patterns: "*.conf"
+      register: _sites
+
+    - name: Undefined websites to be removed
+      debug:
+        msg: >-
+          {{ (_sites | json_query('files[*].path')
+          | map('regex_replace', '^.*/(.*)\.conf$', '\1') | list)
+          | difference(webserver_websites | default([])
+          | json_query('[*].name')) }}
+
+    - name: Include remove_website.yml
+      include_tasks: remove_website.yml
+      loop: >-
+        {{ (_sites | json_query('files[*].path')
+        | map('regex_replace', '^.*/(.*)\.conf$', '\1') | list)
+        | difference(webserver_websites | default([])
+        | json_query('[*].name')) }}
+      loop_control:
+        loop_var: _website
+
+  when: webserver_state | default('present') == 'present'
+
+- name: Remove websites and webserver block
+  block:
+
+    - name: Get list of currently configured nginx websites
+      find:
+        paths: >-
+          {{ lookup('vars',
+          'webserver_' + webserver_daemon + '_conf_sites_dir')
+          }}
+        file_type: file
+        patterns: "*.conf"
+      register: _sites
+
+    - name: Include remove_website.yml
+      include_tasks: remove_website.yml
+      loop: >-
+        {{ _sites | json_query('files[*].path')
+        | map('regex_replace', '^.*/(.*)\.conf$', '\1') | list }}
+      loop_control:
+        loop_var: _website
+
+    - name: "Include remove task file for {{ webserver_daemon }}"
+      include_tasks: remove_{{ webserver_daemon }}.yml
+
+  when: webserver_state | default('present') == 'absent'

@@ -1,0 +1,13 @@
+---
+
+- name: Remove Vuls directory
+  file:
+    path: "{{ vuls_main_directory }}"
+    state: absent
+
+# workaround for https://github.com/future-architect/vuls/issues/1021
+- name: Remove /vuls symlink to workaround bogus absolute symlink on docker host
+  file:
+    path: /vuls
+    state: absent
+

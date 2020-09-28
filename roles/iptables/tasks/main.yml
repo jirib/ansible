@@ -1,0 +1,91 @@
+---
+
+- name: Gather all facts
+  setup:
+
+- name: Install iptables
+  package:
+    name: iptables-services
+    state: installed
+
+- name: Insert iptables rules from iptables_rules variable
+  iptables:
+    action: "{{ item.action | default(omit) }}"
+    chain: "{{ item.chain | default(omit) }}"
+    comment: "{{ item.comment | default(omit) }}"
+    ctstate: "{{ item.ctstate | default(omit) }}"
+    destination: "{{ item.destination | default(omit) }}"
+    destination_port: "{{ item.destination_port | default(omit) }}"
+    dst_range: "{{ item.dst_range | default(omit) }}"
+    # TODO: flush
+    fragment: "{{ item.fragment | default(omit) }}"
+    gateway: "{{ item.gateway | default(omit) }}"
+    gid_owner: "{{ item.gid_owner | default(omit) }}"
+    goto: "{{ item.goto | default(omit) }}"
+    icmp_type: "{{ item.icmp_type | default(omit) }}"
+    in_interface: "{{ item.in_interface | default(omit) }}"
+    ip_version: "{{ item.ip_version | default(omit) }}"
+    jump: "{{ item.jump | default(omit) }}"
+    limit: "{{ itemm.limit | default(omit) }}"
+    limit_burst: "{{ item.limit_burst | default(omit) }}"
+    log_level: "{{ item.log_level | default(omit) }}"
+    log_prefix: "{{ item.log_prefix | default(omit) }}"
+    match: "{{ item.match | default(omit) }}"
+    out_interface: "{{ item.out_interface | default(omit) }}"
+    policy: "{{ item.policy | default(omit) }}"
+    protocol: "{{ item.protocol | default(omit) }}"
+    reject_with: "{{ item.reject_with | default(omit) }}"
+    rule_num: "{{ item.rule_num | default(omit) }}"
+    set_counters: "{{ item.set_counters | default(omit) }}"
+    source: "{{ item.source | default(omit) }}"
+    source_port: "{{ item.source_port | default(omit) }}"
+    src_range: "{{ item.src_range | default(omit) }}"
+    state: "{{ item.state | default(omit) }}"
+    syn: "{{ item.syn | default(omit) }}"
+    table: "{{ item.table | default(omit) }}"
+    tcp_flags: "{{ item.tcp_flags | default(omit) }}"
+    to_destination: "{{ item.to_destination | default(omit) }}"
+    to_ports: "{{ item.to_ports | default(omit) }}"
+    to_source: "{{ item.to_source | default(omit) }}"
+    uid_owner: "{{ item.uid_owner | default(omit) }}"
+  loop: "{{ iptables_rules }}"
+  when: iptables_rules | length > 0
+  notify: iptables
+
+- name: Enable iptables at boot
+  service:
+    name: iptables
+    enabled: true
+    state: started
+  when: iptables_rules | length > 0
+
+- command: iptables-save
+  register: _iptablessave
+
+- name: Show filtered iptables-save output
+  debug:
+    msg: >-
+      {{ _iptablessave.stdout_lines
+      | map('regex_search', _regex)
+      | select('string') | list }}
+  vars:
+    _regex: "{{ '^(?!(%s)).*' | format(iptables_exclude_patterns | join('|')) }}"
+  when:
+    - iptables_rules | length > 0
+    - iptables_exclude_patterns | default([]) | length > 0
+    - _iptablessave.stdout_lines | default([]) | length > 0
+
+- name: Save filtered iptables rules to /etc/sysconfig/iptables
+  copy:
+    content: |
+      {% for _s in _iptablessave.stdout_lines | map('regex_search', _regex) | select('string') | list %}
+      {{ _s }}
+      {% endfor %}
+    dest: /etc/sysconfig/iptables
+    backup: true
+  vars:
+    _regex: "{{ '^(?!(%s)).*' | format(iptables_exclude_patterns | join('|')) }}"
+  when:
+    - iptables_rules | length > 0
+    - iptables_exclude_patterns | default([]) | length > 0
+    - _iptablessave.stdout_lines | default([]) | length > 0

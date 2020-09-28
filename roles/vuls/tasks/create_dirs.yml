@@ -1,0 +1,27 @@
+---
+
+- name: Create Vuls and its components directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "root"
+    group: "root"
+  loop:
+    - "{{ vuls_main_directory }}"
+    - "{{ vuls_main_directory }}/ssh"
+    - "{{ vuls_data_directory }}/results"
+    - "{{ vuls_logs_directory }}"
+    - "{{ vuls_go_cve_dictionary_log_directory }}"
+    - "{{ vuls_goval_dictionary_log_directory }}"
+    - "{{ vuls_gost_log_directory }}"
+    - "{{ vuls_go_exploitdb_log_directory }}"
+    - "{{ vuls_go_msfdb_log_directory }}"
+    - "{{ vuls_vuls_log_directory }}"
+
+# workaround for https://github.com/future-architect/vuls/issues/1021
+- name: Create /vuls symlink to workaround bogus absolute symlink on docker host
+  file:
+    src: "{{ vuls_data_directory }}"
+    dest: /vuls
+    state: link
+    force: true

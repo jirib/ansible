@@ -1,0 +1,28 @@
+---
+
+# individual website removal
+
+- name: Include remove_website_{{ webserver_daemon }}.yml
+  include_tasks: remove_website_{{ webserver_daemon }}.yml
+
+- name: Conditionally cleanup filesystem after website removal
+  block:
+
+    - name: "Get website location from symlink in {{ webserver_www_sites_dir }}"
+      stat:
+        path: "{{ webserver_www_sites_dir }}/{{ _website }}"
+      register: _stat
+
+    - name: "Remove {{ _website }} symlink in {{ webserver_www_sites_dir }}"
+      file:
+        path: "{{ webserver_www_sites_dir }}/{{ _website }}"
+        state: absent
+
+    - name: Remove content of undefined website from filesystem
+      file:
+        path: "{{ _stat.stat.lnk_source }}"
+        state: absent        
+      when: _stat.stat.exists and _stat.stat.lnk_source is defined
+
+  when: webserver_websites_postremove_cleanup | bool
+

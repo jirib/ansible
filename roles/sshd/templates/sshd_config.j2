@@ -1,0 +1,23 @@
+{# TODO: listen, port...? #}
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+SyslogFacility AUTHPRIV
+AuthorizedKeysFile {{ ssh_authorizedkeyfile | default('.ssh/authorized_keys') }}
+PasswordAuthentication {{ sshd_passwordauthentication | default('no') }}
+PermitRootLogin {{ ssh_permitrootlogin | default('yes') }}
+ChallengeResponseAuthentication no
+GSSAPIAuthentication {{ sshd_gssapiauthentication | default('no') }}
+GSSAPICleanupCredentials no
+UseDNS {{ sshd_usedns }}
+UsePAM yes
+X11Forwarding {{ sshd_x11forwarding }}
+AcceptEnv LANG LC_CTYPE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY LC_MESSAGES
+AcceptEnv LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT
+AcceptEnv LC_IDENTIFICATION LC_ALL LANGUAGE
+AcceptEnv XMODIFIERS
+{{ sshd_system | default('Subsystem       sftp    /usr/libexec/openssh/sftp-server') }}
+{# sshd_extra_parameters is literal block of sshd_config options #}
+{# keep in mind the order, if a keyword appears in multiple Match blocks that #}
+{# are satisfied, only the first instance of the keyword is applied! #}
+{{ sshd_extra_parameters | default('') }}

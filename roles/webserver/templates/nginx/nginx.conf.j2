@@ -1,0 +1,58 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format main {{ webserver_nginx_log_format | indent(21) }};
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 4096;
+
+    include           /etc/nginx/mime.types;
+    default_type       application/octet-stream;
+
+    # Load modular configuration files from the /etc/nginx/conf.d directory.
+    # See http://nginx.org/en/docs/ngx_core_module.html#include
+    # for more information.
+    include /etc/nginx/conf.d/*.conf;
+
+    # prevention of processing request with undefined server names
+    server {
+        listen 80 default;
+        server_name "";
+        {{ webserver_nginx_default_server_extra_parameters | default('return 444;') }}
+    }
+    server {
+        listen 443 ssl default;
+        server_name "";
+
+        # based on mozilla SSL Configuration Generator
+        ssl_certificate /etc/pki/tls/certs/fake.crt;
+        ssl_certificate_key /etc/pki/tls/private/fake.key;
+        ssl_session_timeout 1d;
+        ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
+        ssl_session_tickets off;
+        ssl_dhparam /etc/pki/tls/certs/dhparam.pem;
+        # intermediate configuration
+        ssl_protocols {{ webserver_ssl_protocols }};
+        ssl_ciphers '{{ webserver_ssl_ciphers | join(':') }}';
+        ssl_prefer_server_ciphers off;
+        {{ webserver_nginx_default_server_extra_paramenters | default('return 444;') }}
+    }
+
+    include {{ webserver_nginx_conf_sites_dir }}/*.conf;
+}

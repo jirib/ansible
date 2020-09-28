@@ -1,0 +1,78 @@
+---
+
+# individual php-fpm instance creation
+
+- name: Remove /etc/sysconfig/php-fpm-{{ _website.name }}, no options defined
+  file:
+    path: "/etc/sysconfig/php-fpm-{{ _website.name }}"
+    state: absent
+  register: _rmsysconfig
+  when:
+    - _website.pm_options | default('') | length == 0
+    - php_fpm_options | default('') | length == 0
+  notify: phpfpm
+
+- name: "Create /etc/sysconfig/php-fpm-{{ _website.name }}"
+  copy:
+    content: |
+      OPTIONS="{{ _website.pm_options | default(php_fpm_options) }}"
+    dest: "/etc/sysconfig/php-fpm-{{ _website.name }}"
+  register: _mksysconfig
+  when: >-
+    (_website.pm_options | default('') | length > 0) or
+    (php_fpm_options | default('') | length > 0)
+  notify: phpfpm
+
+- name: Remove /etc/systemd/system/php-fpm@{{ _website.name }}.service.d
+  file:
+    path: /etc/systemd/system/php-fpm@{{ _website.name }}.service.d
+    state: absent
+  register: _rmoverride
+  when: _website.service_override is not defined
+  notify: phpfpm
+
+- name: Create service override for php-fpm@{{ _website.name }}.service
+  block:
+
+    - name: Create /etc/systemd/system/php-fpm@{{ _website.name }}.service.d
+      file:
+        path: /etc/systemd/system/php-fpm@{{ _website.name }}.service.d
+        state: directory
+
+    - name: Create override.conf in php-fpm@{{ _website.name }}.service.d
+      copy:
+        content: "{{ _website.service_override }}"
+        dest: >-
+          {{ '/etc/systemd/system/php-fpm@%s.service.d/override.conf'
+          | format(_website.name) }}
+      register: _override
+      notify: phpfpm
+
+  when: _website.service_override is defined
+
+- name: Deploy PHP-FPM instance configuration file
+  template:
+    src: php-fpm.conf.j2
+    dest: "{{ php_fpm_sites_conf_dir }}/{{ _website.name }}.conf"
+    validate: /sbin/php-fpm -t -y %s
+  register: _phpfpm
+  notify: phpfpm
+
+# append php-fpm website name into _modified variable if any
+# configuration files was changed, this variable is later used in
+# handlers to reload only changed php-fpm website instances
+- name: Add to _modified if instance files were modified
+  set_fact:
+    _modified: >-
+      {{ _modified +
+      (_rmsysconfig.changed | ternary([_website.name], [])) +
+      (_mksysconfig.changed | ternary([_website.name], [])) +
+      (_rmoverride.changed | ternary([_website.name], [])) +
+      (_override.changed | ternary([_website.name], [])) +
+      (_phpfpm.changed | ternary([_website.name], [])) }}
+
+- name: Enable and start PHP-FPM instance service
+  service:
+    name: php-fpm@{{ _website.name }}.service
+    enabled: true
+    state: started

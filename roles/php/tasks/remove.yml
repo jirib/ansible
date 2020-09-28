@@ -1,0 +1,18 @@
+---
+
+- name: Get list of PHP website logs
+  find:
+    paths: /var/log/php-fpm
+    file_type: file
+    patterns: "*-slow.log,*-access.log,*-error.log"
+  register: _logs
+
+- name: Remove customized PHP files/dirs and website logs
+  file:
+    path: "{{ item }}"
+    state: absent
+  vars:
+    _etcfiles:
+      - /etc/systemd/system/php-fpm@.service
+      - "{{ php_fpm_sites_conf_dir }}"      
+  loop: "{{ _etcfiles + (_logs | json_query('files[*].path')) }}"

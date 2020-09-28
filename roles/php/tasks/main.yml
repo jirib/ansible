@@ -1,0 +1,56 @@
+---
+
+# tasks file for PHP
+
+- name: Create PHP and PHP wesites block
+  block:
+
+    - name: Include create.yml
+      include_tasks: create.yml
+
+    # _modified variable is to hold "return" values from looped included task
+    # which is used later to inform handler which instance to reload
+    - name: Set _modified variable
+      set_fact:
+        _modified: []
+
+    - name: Include create_phpfpm.yml
+      include_tasks: create_phpfpm.yml
+      loop: "{{ php_websites | default([]) }}"
+      loop_control:
+        loop_var: _website
+
+    - name: Get list of current configured PHP websites
+      find:
+        paths: "{{ php_fpm_sites_conf_dir }}"
+        file_type: file
+        patterns: "*.conf"
+      register: _websites
+
+    - name: Undefined PHP websites to be removed
+      debug:
+        msg: >-
+          {{ (_websites | json_query('files[*].path')
+          | map('regex_replace', '^.*/(.*)\.conf$', '\1') | list)
+          | difference(php_websites | default([])
+          | json_query('[*].name')) }}
+
+    - name: Include remove_phpfpm.yml
+      include_tasks: remove_phpfpm.yml
+      loop: >-
+        {{ (_websites | json_query('files[*].path')
+        | map('regex_replace', '^.*/(.*)\.conf$', '\1') | list)
+        | difference(php_websites | default([])
+        | json_query('[*].name')) }}
+      loop_control:
+        loop_var: _website
+
+  when: php_state | default('present') == 'present'
+
+- name: Remove PHP websites and PHP
+  block:
+
+    - name: Include remove.yml
+      include_tasks: remove.yml
+
+  when: php_state | default('present') == 'absent'

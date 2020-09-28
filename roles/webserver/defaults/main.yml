@@ -1,0 +1,44 @@
+---
+# defaults file for webserver variables per webserver daemon are in
+# separate variable file
+
+webserver_daemon: nginx
+
+# for ocsp
+webserver_resolvers:
+  - 1.1.1.1
+
+# tls
+# mozilla SSL Configuration Generator intermediate nginx >= 1.17.7
+webserver_ssl_protocols: "TLSv1.2 TLSv1.3"
+webserver_ssl_ciphers:
+  - ECDHE-ECDSA-AES128-GCM-SHA256
+  - ECDHE-RSA-AES128-GCM-SHA256
+  - ECDHE-ECDSA-AES256-GCM-SHA384
+  - ECDHE-RSA-AES256-GCM-SHA384
+  - ECDHE-ECDSA-CHACHA20-POLY1305
+  - ECDHE-RSA-CHACHA20-POLY1305
+  - DHE-RSA-AES128-GCM-SHA256
+  - DHE-RSA-AES256-GCM-SHA384
+
+# paths
+webserver_www_dir: /var/www
+webserver_www_sites_dir: "{{ webserver_www_dir }}/sites"
+webserver_www_users_dir: "{{ webserver_www_dir }}/users"
+
+# list of websites
+webserver_websites:
+  - name: www.example.com
+    urls:
+      - www.example.com
+      - example.com
+    # tls:
+    #   certificate: /etc/pki/tls/certs/test.example.com.crt
+    #   key: /etc/pki/tls/private/test.example.com.key
+    # nginx_extra_parameters: |
+    #   location ~ ^/wp.config.php$ {
+    #     deny all;
+    #   }
+
+# if to remove website content when undefined websites got unlinked
+webserver_websites_postremove_cleanup: false

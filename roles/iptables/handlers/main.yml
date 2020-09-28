@@ -1,0 +1,13 @@
+---
+
+- name: Dump runtime iptables rules to /etc/sysconfig/iptables
+  command:
+    cmd: iptables-save
+  register: _iptablessave
+  listen: iptables
+
+- name: Restart iptables service
+  service:
+    name: iptables
+    state: restarted
+  when: iptables_restart | bool

@@ -1,0 +1,37 @@
+---
+
+# tasks common to all webservers
+
+- name: Getting amazon-linux-extras package
+  package:
+    name: amazon-linux-extras
+    state: present
+    update_cache: yes
+  when: "'Amazon' in ansible_distribution"
+
+- name:  Generate Diffie-Hellman parameters
+  openssl_dhparam:
+    path: /etc/pki/tls/certs/dhparam.pem
+    size: 2048
+
+# fake SSL cert/key use to prevent processing request with undefined server name
+# on HTTPS port, https://bit.ly/3jAeBiM
+- name: Generating an OpenSSL private key
+  openssl_privatekey:
+    path: /etc/pki/tls/private/fake.key
+  check_mode: false
+  no_log: true
+
+- name: Generating an OpenSSL certificate signing request
+  openssl_csr:
+    path: /etc/pki/tls/certs/fake.csr
+    privatekey_path: /etc/pki/tls/private/fake.key
+  check_mode: false
+
+- name: Generating a Self Signed OpenSSL certificate which is valid for 10 years
+  openssl_certificate:
+    path: /etc/pki/tls/certs/fake.crt
+    privatekey_path: /etc/pki/tls/private/fake.key
+    csr_path: /etc/pki/tls/certs/fake.csr
+    provider: selfsigned
+  check_mode: false

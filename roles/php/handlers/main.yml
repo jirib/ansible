@@ -1,0 +1,41 @@
+---
+
+# handlers file for php
+
+- name: Reload systemd after unit change
+  systemd:
+    daemon_reload: true
+  listen:
+    - php
+    - phpfpm
+
+- name: Get list of php-fpm instances
+  service_facts:
+  listen: php
+
+# reload php-fpm.service and all instantized php-fpm@ services, this
+# is run when php.ini was changed
+- name: Reload php-fpm instances
+  service:
+    name: "{{ item }}"
+    state: reloaded
+  loop: >-
+    {{ ansible_facts.services | json_query('keys(@)')
+    | map('regex_search', '^php-fpm@((?!\.).*)*$') | select('string')
+    | list }}
+  listen: php
+
+# this is run when any php-fpm instance got its configuration changed
+- name: Print php-fpm instances to be reloaded
+  debug:
+    msg: >-
+      {{ _modified | unique
+      | map('regex_replace', '^(.*)', 'php-fpm@\1.service') | list }}
+  listen: phpfpm
+
+- name: Reload individual php-fpm instance
+  service:
+    name: "{{ 'php-fpm@%s.service' | format(item) }}"
+    state: reloaded
+  loop: "{{ _modified | unique }}"
+  listen: phpfpm

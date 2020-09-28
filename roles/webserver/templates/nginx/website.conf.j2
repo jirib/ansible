@@ -1,0 +1,65 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+{% set site = webserver_website %}
+
+server {
+    server_name {{ site.urls | join(' ') }};
+    {% if site.tls is defined %}
+    return 301 https://$server_name$request_uri;
+    {% else %}
+    root {{ webserver_www_sites_dir }}/{{ site.name }}/html;
+    {% if site.autoindex | default(False) %}
+    autoindex on;
+    {% endif %}
+    {% if site.nginx_extra_parameters is defined %}
+    {{ site.nginx_extra_parameters | indent(4) }}
+    {% endif %}
+    {% endif %}
+
+}
+
+{% if site.tls is defined %}
+server {
+    listen 443 ssl;
+
+    # based on mozilla SSL Configuration Generator
+    ssl_certificate {{ site.tls.certificate }};
+    ssl_certificate_key {{ site.tls.key }};
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m; # about 40000 sessions
+    ssl_session_tickets off;
+
+    ssl_dhparam /etc/pki/tls/certs/dhparam.pem;
+
+    # intermediate configuration
+    ssl_protocols {{ site.tls.ssl_protocols | default(webserver_ssl_protocols) }};
+    ssl_ciphers '{{ site.tls.ssl_ciphers | default(webserver_ssl_ciphers) | join(':') }}';
+    ssl_prefer_server_ciphers off;
+
+    ## verify chain of trust of OCSP response using Root CA and Intermediate certs
+    {% if site.tls.trusted_certificate is defined %}
+    ssl_trusted_certificate {{ site.tls.trusted_certificate }};
+    {% endif %}
+
+    # HSTS
+    {% if site.tls.hsts | default(True) %}
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    {% endif %}
+
+    # OCSP Stapling
+    # fetch OCSP records from URL in ssl_certificate and cache them
+    {% if site.tls.stapling | default(False) %}
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver {{ webserver_resolvers | join(' ') }};
+    {% endif %}
+
+    server_name {{ site.urls | join(' ') }};
+    root {{ webserver_www_sites_dir }}/{{ site.name }}/html;
+    {% if site.autoindex | default(False) %}
+    autoindex on;
+    {% endif %}
+    {% if site.nginx_extra_parameters is defined %}
+    {{ site.nginx_extra_parameters | indent(4) }}
+    {% endif %}
+}
+{% endif %}

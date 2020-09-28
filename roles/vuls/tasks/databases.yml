@@ -1,0 +1,244 @@
+---
+
+# yaml anchors used not to duplicate tasks all the time,
+# see eg. https://bit.ly/32fAgr3
+
+# but there's problem with 'register' hence workarounds we can't use
+# unique register variable name for both similar tasks as it is
+# overwritten by skipped task
+
+- &go_cve_dictionary
+  name: Download NVD database locally
+  docker_container:
+    name: "cve-{{ _year }}"
+    image: vuls/go-cve-dictionary
+    auto_remove: true
+    interactive: true
+    state: started
+    command: "fetchnvd -years {{ _year }}"
+    volumes:
+      - "{{ vuls_data_directory }}:/vuls"
+      - "{{ vuls_go_cve_dictionary_log_directory }}:/var/log/vuls"
+  register: __go_cve_dictionary
+  loop_control:
+    loop_var: _year
+  loop: >-
+    {{ range(vuls_go_cve_dictionary_start_year,
+    ('%Y' | strftime(ansible_date_time.epoch) | int + 1))
+    | list }}
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *go_cve_dictionary
+  register: __go_cve_dictionary_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+# json_query needed because we used 'loop'
+- name: Set _go_cve_dictionary variable
+  set_fact:
+    _go_cve_dictionary: "{{ item }}"
+  vars:
+    _query: "results[?ansible_facts!=`null`]"
+  loop:
+    - "{{ __go_cve_dictionary }}"
+    - "{{ __go_cve_dictionary_ }}"
+  when: item | json_query(_query)
+
+# https://github.com/kotakanbe/goval-dictionary#usage-fetch-oval-data-from-redhat
+- &goval_dictionary_rhel
+  name: Download OVAL database for RHEL locally
+  docker_container:
+    name: "redhat-oval-{{ _redhat_oval_version }}"
+    image: vuls/goval-dictionary
+    auto_remove: true
+    interactive: true
+    state: started
+    command: "fetch-redhat {{ _redhat_oval_version }}"
+    volumes:
+      - "{{ vuls_data_directory }}:/vuls"
+      - "{{ vuls_goval_dictionary_log_directory }}:/var/log/vuls"
+  register: __goval_dictionary_rhel
+  loop_control:
+    loop_var: _redhat_oval_version
+  loop: "{{ vuls_goval_dictionary_rhel_versions }}"
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *goval_dictionary_rhel
+  register: __goval_dictionary_rhel_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+# json_query needed because we used 'loop'
+- name: Set _goval_dictionary_rhel variable
+  set_fact:
+    _goval_dictionary_rhel: "{{ item }}"
+  vars:
+    _query: "results[?ansible_facts!=`null`]"
+  loop:
+    - "{{ __goval_dictionary_rhel }}"
+    - "{{ __goval_dictionary_rhel_ }}"
+  when: item | json_query(_query)
+
+- &goval_dictionary_amazon
+  name: Download OVAL database for Amazon Linux locally
+  docker_container:
+    name: "amazon-oval"
+    image: vuls/goval-dictionary
+    auto_remove: true
+    interactive: true
+    state: started
+    command: "fetch-amazon"
+    volumes:
+      - "{{ vuls_data_directory }}:/vuls"
+      - "{{ vuls_goval_dictionary_log_directory }}:/var/log/vuls"
+  register: __goval_dictionary_amazon
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *goval_dictionary_amazon
+  register: __goval_dictionary_amazon_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+- name: Set _goval_dictionary_amazon variable
+  set_fact:
+    _goval_dictionary_amazon: "{{ item }}"
+  loop:
+    - "{{ __goval_dictionary_amazon }}"
+    - "{{ __goval_dictionary_amazon_ }}"
+  when: item.ansible_facts is defined
+
+# https://github.com/knqyf263/gost#fetch-redhat
+- &gost
+  name: Download GOST locally
+  docker_container:
+    name: "gost"
+    image: vuls/gost
+    auto_remove: true
+    interactive: true
+    state: started
+    command: fetch redhat
+    volumes:
+      - "{{ vuls_data_directory }}:/vuls"
+      - "{{ vuls_gost_log_directory }}:/var/log/gost"
+  register: __gost
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *gost
+  register: __gost_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+- name: Set _gost variable
+  set_fact:
+    _gost: "{{ item }}"
+  loop:
+    - "{{ __gost }}"
+    - "{{ __gost_ }}"
+  when: item.ansible_facts is defined
+
+# https://github.com/vulsio/go-exploitdb#usage-fetch-and-insert-exploit
+- &go_exploitdb
+  name: Download Exploit-DB.com data locally
+  docker_container:
+    name: "go-exploitdb"
+    image: vuls/go-exploitdb
+    auto_remove: true
+    interactive: true
+    state: started
+    command: fetch exploitdb
+    volumes:
+      - "{{ vuls_data_directory }}:/vuls"
+      - "{{ vuls_go_exploitdb_log_directory }}:/var/log/go-exploitdb"
+  register: __go_exploitdb
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *go_exploitdb
+  register: __go_exploitdb_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+- name: Set _go_exploitdb variable
+  set_fact:
+    _go_exploitdb: "{{ item }}"
+  loop:
+    - "{{ __go_exploitdb }}"
+    - "{{ __go_exploitdb_ }}"
+  when: item.ansible_facts is defined
+
+# https://github.com/takuzoo3868/go-msfdb#usage-fetch-and-insert-modules-info
+- &go_msfdb
+  name: Download Metasploit data locally
+  docker_container:
+    name: "go-msfdb"
+    image: vuls/go-msfdb
+    auto_remove: true
+    interactive: true
+    state: started
+    command: fetch msfdb
+    volumes:
+      - "{{ vuls_data_directory }}:/vuls"
+      - "{{ vuls_go_msfdb_log_directory }}:/var/log/go-msfdb"
+  register: __go_msfdb
+  when: docker_compose_python_venv_dir | length == 0
+
+- <<: *go_msfdb
+  register: __go_msfdb_
+  vars:
+    ansible_python_interpreter: >-
+      {{ docker_compose_python_venv_dir }}/bin/python
+  when: docker_compose_python_venv_dir | length > 0
+
+- name: Set _go_msfdb variable
+  set_fact:
+    _go_msfdb: "{{ item }}"
+  loop:
+    - "{{ __go_msfdb }}"
+    - "{{ __go_msfdb_ }}"
+  when: item.ansible_facts is defined
+
+- name: Print containers PIDs for which we will wait to disappear
+  debug:
+    var: >-
+      [
+      _gost.ansible_facts.docker_container.State.Pid,
+      _go_exploitdb.ansible_facts.docker_container.State.Pid,
+      _go_msfdb.ansible_facts.docker_container.State.Pid,
+      _goval_dictionary_amazon.ansible_facts.docker_container.State.Pid,
+      ] + (_go_cve_dictionary | json_query(_query)) +
+      (_goval_dictionary_rhel | json_query(_query))
+  vars:
+    _query: "results[].ansible_facts.docker_container.State.Pid"
+  when: not ansible_check_mode
+
+# default() filters are present because even if this role is conditionally
+# not included via '/meta' definition, ansible still checks somehow the syntax
+- name: Wait for containers to finish their work
+  wait_for:
+    delay: 1
+    timeout: 600
+    path: /proc/{{ _pid }}/status
+    state: absent
+  vars:
+    _query: "results[].ansible_facts.docker_container.State.Pid"
+  loop_control:
+    loop_var: _pid
+  # first individual containers, then containers started via loop
+  loop: >-
+    {{ [
+    _gost.ansible_facts.docker_container.State.Pid | default(''),
+    _go_exploitdb.ansible_facts.docker_container.State.Pid | default(''),
+    _go_msfdb.ansible_facts.docker_container.State.Pid | default(''),
+    _goval_dictionary_amazon.ansible_facts.docker_container.State.Pid | default(''),
+    ] + (_go_cve_dictionary | default({}) | json_query(_query)) | default([], true) +
+    (_goval_dictionary_rhel | default({}) | json_query(_query)) | default([], true)
+    }}

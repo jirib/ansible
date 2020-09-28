@@ -1,0 +1,52 @@
+---
+
+# vuls_config will generate toml-based Vuls config
+# see https://vuls.io/docs/en/usage-settings.html
+vuls_config:
+  default:
+    ignoreCves:
+      - CVE-2020-8834 # power8 platform
+
+vuls_main_directory: /data/vuls
+vuls_data_directory: "{{ vuls_main_directory }}/data"
+vuls_logs_directory: "{{ vuls_main_directory }}/logs"
+vuls_ssh_directory: "{{ vuls_main_directory }}/ssh"
+
+vuls_go_cve_dictionary_log_directory: >-
+  {{ vuls_logs_directory }}/go-cve-dictionary-log
+vuls_goval_dictionary_log_directory: >-
+  {{ vuls_logs_directory }}/goval-dictionary-log
+vuls_gost_log_directory: >-
+  {{ vuls_logs_directory }}/gost-log
+vuls_go_exploitdb_log_directory: >-
+  {{ vuls_logs_directory }}/go-exploitdb-log
+vuls_go_msfdb_log_directory: >-
+  {{ vuls_logs_directory }}/go-msfdb-log
+vuls_vuls_log_directory: >-
+  {{ vuls_logs_directory }}/vuls-log
+
+vuls_go_cve_dictionary_start_year: 2015
+vuls_goval_dictionary_rhel_versions:
+  - 7
+  - 8
+
+# save JSON report on managed node
+vuls_scan_save_report: true
+vuls_scan_save_metrics: false
+
+# where to upload prometheus-like metrics for scanned data
+#vuls_scan_metrics_host: "foo.example.com"
+# ssh user to use if different from the user running scan
+#vuls_scan_metrics_user: "foobar"
+
+# vuls server and vulsrepo as service via docker-compose
+vuls_vuls_service: true
+vuls_webui_service: true
+
+vuls_server_port: 5515
+vuls_server_url: "http://127.0.0.1:{{ vuls_server_port }}/vuls"
+vuls_server_options: >-
+  -listen 0.0.0.0:{{ vuls_server_port }} -debug -to-localfile -format-json
+
+vuls_webui_port: 5111
+vuls_webui_options: ""

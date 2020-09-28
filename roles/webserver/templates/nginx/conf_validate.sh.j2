@@ -1,0 +1,25 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+{% set _conf_sites_dir = webserver_nginx_conf_sites_dir | replace('/', '\/') %}
+#!/usr/bin/env bash
+
+# this is a wrapper for ansible template task validate option which
+# validates main nging.conf without individual virtual sites
+
+set -eux
+set -o pipefail
+
+# args: conf_file
+
+[[ $# == 1 ]]
+
+conf_file=$1
+tmpfile=$(mktemp)
+
+trap "rm -f ${tmpfile}" EXIT
+
+[[ -e "${conf_file}" ]]
+
+cat ${tmpfile} | \
+    sed -r -e '/^[[:blank:]]+include {{ _conf_sites_dir }}\/\*\.conf;/d' \
+	> ${tmpfile}
+nginx -t -c ${conf_file}

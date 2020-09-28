@@ -1,0 +1,27 @@
+---
+
+- name: Include tasks to create Vuls scanner environment
+  block:
+
+    - include_tasks: create_dirs.yml
+    - include_tasks: containers.yml
+    - include_tasks: databases.yml
+      when: not vuls_databases_update_skip | default(False) | bool
+    - include_tasks: vuls.yml
+      when: vuls_vuls_service | bool
+    - include_tasks: webui.yml
+      when: vuls_webui_service | bool
+
+  when: vuls_state | default('present') == 'present'
+
+- name: Include tasks to remove Vuls scanner environment
+  block:
+
+    - include_tasks: webui.yml
+      when: vuls_webui_service | bool    
+    - include_tasks: vuls.yml
+      when: vuls_vuls_service | bool
+    - include_tasks: containers.yml
+    - include_tasks: remove_dirs.yml
+
+  when: vuls_state | default('present') == 'absent'

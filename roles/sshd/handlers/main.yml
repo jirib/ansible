@@ -1,0 +1,11 @@
+---
+
+# handlers file for sshd
+
+- name: Reload sshd
+  service:
+    name: sshd
+    state: reloaded
+  listen: sshd
+
+

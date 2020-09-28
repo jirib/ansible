@@ -1,0 +1,13 @@
+---
+
+# tasks to unconfigure website at nginx
+
+- name: Unlink website configuration
+  file:
+    path: >-
+      {{ webserver_nginx_conf_sites_dir }}/{{ _website }}.conf
+    state: absent
+  notify: nginx
+
+- name: Force handlers
+  meta: flush_handlers

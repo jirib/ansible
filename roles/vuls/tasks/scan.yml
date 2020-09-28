@@ -1,0 +1,101 @@
+---
+
+- name: Setup
+  setup:
+    
+# package_facts doesn't have good format for Vuls
+- name: Run rpm -qa command with specified format
+  shell:
+  args:
+    cmd: >-
+      rpm -qa --queryformat '%{NAME} %{EPOCHNUM} %{VERSION} %{RELEASE} %{ARCH}\n'
+    executable: /bin/bash
+    warn: false
+  check_mode: false
+  register: _rpmqa
+
+- name: Get exact Amazon Linux distro release
+  command:
+    cmd: >-
+      awk '{if ($0 ~ /Amazon\ Linux\ release\ 2/)
+      printf("%s %s",$4, $5); else
+      if ($0 ~ /Amazon\ Linux\ 2/)
+      for (i=3; i<=NF; i++) printf("%s ", $i); else
+      if (NF==5) print $5}' /etc/system-release
+  register: _amazon_release
+  check_mode: false
+  when: "'Amazon' in ansible_distribution"
+
+- name: Get exact Centos Linux distro release
+  command:
+    cmd: >-
+      awk '{print $4}' /etc/redhat-release
+  register: _centos_release
+  check_mode: false
+  when: "'CentOS' in ansible_distribution"      
+
+# data are sent from control node, see delegate_to in the task
+- name: POST data to Vuls server
+  uri:
+    # set vuls server url to localhost instance by default
+    url: "{{ vuls_server_url | default('http://127.0.0.1:5515/vuls') }}"
+    method: POST
+    body: "{{ _rpmqa.stdout }}"
+    remote_src: "true"
+    headers:
+      Content-Type: text/plain
+      X-Vuls-Server-Name: "{{ inventory_hostname }}"
+      X-Vuls-OS-Family: "{{ ansible_distribution | lower }}"
+      X-Vuls-OS-Release: "{{ _release }}"
+      X-Vuls-Kernel-Release: "{{ ansible_kernel }}"
+  register: _post
+  vars:
+    _release: >-
+      {{ ('Amazon' == ansible_distribution)
+      | ternary(_amazon_release.stdout, _centos_release.stdout) }}
+  delegate_to: localhost
+  no_log: true # too spammy
+
+- name: Save returned JSON file locally
+  copy:
+    content: |-
+      {{ _post.json | first | to_nice_json }}
+    dest: >-
+      /tmp/{{ '%s-%s.json'
+      | format(_post.json[0].scannedAt, inventory_hostname) }}
+  delegate_to: localhost
+  become: false
+  when: vuls_scan_save_report | default(True) | bool
+
+# stripping end of reportedAt time as I could not figure out how to
+# convert it in ansible (it's time.now() in golang)
+- name: Save metrics for Node exporter
+  copy:
+    content: |
+      vuls_scan_scannedcves{target="{{inventory_hostname}}"} {{ _scanned_cves }}
+      vuls_scan_scannedat{target="{{inventory_hostname}}"} {{ _scanned_at }}
+      vuls_scan_reportedat{target="{{inventory_hostname}}"} {{ _reported_at }}
+    dest: >-
+      {{ '/var/lib/node_exporter/textfile_collector/vuls-%s.prom'
+      | format(inventory_hostname) }}
+  delegate_to: "{{ vuls_scan_metrics_host | default('localhost') }}"
+  become: true
+  vars:
+    _scanned_cves: "{{ _post.json[0].scannedCves | list | length }}"
+    _scanned_at: >-
+      {{ (_post.json[0].scannedAt
+      | to_datetime('%Y-%m-%dT%H:%M:%SZ')).strftime('%s') }}
+    _reported_at: >-
+      {{ (_post.json[0].reportedAt.split('.') | first
+      | to_datetime('%Y-%m-%dT%H:%M:%S')).strftime('%s') }}
+    ansible_user: "{{ vuls_scan_metrics_user | default(None) | default(omit) }}"
+  when: vuls_scan_save_metrics | default(False) | bool
+
+- name: Debug print of number of discovered Cves
+  debug:
+    msg: >-
+      {{ 'inventory_hostname: %s, scannedAt: %s, scannedCves: %d'
+      | format(inventory_hostname, _post.json[0].scannedAt, _post.json[0]
+      | json_query("scannedCves") | list | length) }}
+  failed_when: _post.json[0].scannedCves | list | length > 0
+  ignore_errors: true

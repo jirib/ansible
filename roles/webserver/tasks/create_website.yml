@@ -1,0 +1,10 @@
+---
+
+# individual website creation
+
+- name: Include website_common.yml
+  include_tasks: website_common.yml
+
+- name: Include create_website_{{ webserver_daemon }}.yml
+  include_tasks: create_website_{{ webserver_daemon }}.yml
+

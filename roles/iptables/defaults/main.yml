@@ -1,0 +1,18 @@
+---
+
+iptables_rules: []
+# iptables_rules:
+#   - chain: INPUT
+#     protocol: tcp
+#     destination_port: 8080
+#     jump: ACCEPT
+#     action: insert
+#     rule_num: 5
+
+iptables_restart: false
+
+# list of patterns which would cause iptables-save output be filtered out
+# for lines where declared pattern match
+# eg. 'iptables-exclude_patterns: ["AS0"]' would cause dropping all lines
+# related to OpenVPN AS (as it appends the rules itself to netfilter)
+iptables_exclude_patterns: []

@@ -1,0 +1,27 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+[global]
+error_log = /var/log/php-fpm/{{ _website.name }}-error.log
+daemonize = yes
+
+[{{ _website.name }}]
+user = {{ _website.user | default(php_fpm_group) }}
+group = {{ _website.group | default(php_fpm_group) }}
+listen = /run/php-fpm/$pool.sock
+listen.owner = {{ _website.listen_owner | default(php_fpm_listen_owner) }}
+listen.group = {{ _website.listen_group | default(php_fpm_listen_group) }}
+listen.mode = {{ _website.listen_mode | default(php_fpm_listen_mode) }}
+pm = {{ _website.pm | default(php_fpm_pm) }}
+pm.max_children = {{ _website.pm_max_children | default(php_fpm_pm_max_children) }}
+{% if _website.pm | default(php_fpm_pm) == 'dynamic' %}
+pm.start_servers = {{ _website.pm_start_servers | default(php_fpm_pm_start_servers) }}
+pm.min_spare_servers = {{ _website.pm_min_spare_servers | default(php_fpm_pm_min_spare_servers) }}
+pm.max_spare_servers = {{ _website.pm_max_spare_servers | default(php_fpm_pm_max_spare_servers) }}
+{% elif _website.pm | default(php_fpm_pm) == 'ondemand' %}
+pm.process_idle_timeout = {{ _website.pm_process_idle_timeout | default(php_fpm_pm_process_idle_timeout) }}
+{% endif %}
+access.log = /var/log/php-fpm/$pool-access.log 
+slowlog = /var/log/php-fpm/$pool-slow.log
+{{ _website.php_admin_flag | default(php_fpm_php_admin_flag) }}
+{{ _website.php_admin_value | default(php_fpm_php_admin_value) }}
+{{ _website.php_flag | default(php_fpm_php_flag) }}
+{{ _website.php_value | default(php_fpm_php_value) }}

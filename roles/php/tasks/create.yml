@@ -1,0 +1,65 @@
+---
+
+- name: Include vars
+  include_vars: "{{ ansible_distribution | lower }}.yml"
+
+- name: Getting amazon-linux-extras package
+  package:
+    name: amazon-linux-extras
+    state: present
+    update_cache: yes
+  when: "'Amazon' in ansible_distribution"
+
+- name: Installing PHP from from Amazon Linux 2 Extras
+  command: "amazon-linux-extras install php{{ php_amazon_version }} -y"
+  register: _result
+  changed_when: "'Nothing to do' not in _result.stdout_lines"
+  when: "'Amazon' in ansible_distribution"
+  notify: php
+
+- name: Instal PHP packages
+  package:
+    name: "{{ php_packages | join(',') }}"
+    state: present
+
+- name: Deploying php.ini
+  template:
+    src: php.ini.j2
+    dest: "/etc/php.ini"
+  notify: php
+
+- name: "Create {{ php_fpm_sites_conf_dir }}"
+  file:
+    path: "{{ php_fpm_sites_conf_dir }}"
+    state: directory
+
+- name: Create instantized version of php-fpm.service
+  copy:
+    dest: /etc/systemd/system/php-fpm@.service
+    content: |
+      [Unit]
+      Description=php-fpm@%i
+      After=syslog.target network.target
+
+      [Service]
+      EnvironmentFile=-/etc/sysconfig/php-fpm-%i
+      Type=notify
+      ExecStart=/usr/sbin/php-fpm -y {{ php_fpm_sites_conf_dir }}/%i.conf \
+          --nodaemonize $OPTIONS
+      ExecReload=/bin/kill -USR2 $MAINPID
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: php
+
+- name: Create /etc/systemd/system/php-fpm@.service.d directory
+  file:
+    path: /etc/systemd/system/php-fpm@.service.d
+    state: directory
+
+- name: Create override for instantized version of php-fpm.service
+  copy:
+    dest: /etc/systemd/system/php-fpm@.service.d/override.conf
+    content: "{{ php_fpm_service_override }}"
+  notify: php

@@ -1,0 +1,11 @@
+---
+
+# tasks to configure website at nginx
+
+- name: Link website configuration to nginx
+  template:
+    src: nginx/website.conf.j2
+    dest: >-
+      {{ webserver_nginx_conf_sites_dir }}/{{ webserver_website.name }}.conf
+    validate: /etc/nginx/site_validate.sh %s
+  notify: nginx

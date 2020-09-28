@@ -1,0 +1,53 @@
+---
+
+- name: Include common.yml tasks
+  include_tasks: common.yml
+
+- name: Installing nginx from Amazon Linux 2 Extras
+  command: "amazon-linux-extras install nginx1=latest -y"
+  register: _result
+  changed_when: "'Nothing to do' not in _result.stdout_lines"
+  when: "'Amazon' in ansible_distribution"
+
+- name: Deploy nginx_conf_validate.sh helper
+  template:
+    src: nginx/conf_validate.sh.j2
+    dest: /etc/nginx/conf_validate.sh
+    mode: 0755
+
+- name: Create /etc/nginx/conf.d
+  file:
+    path: /etc/nginx/conf.d
+    state: directory
+
+- name: Deploy configuration files changing nginx defaults
+  template:
+    src: "{{ item }}"
+    dest: "/etc/nginx/conf.d/{{ (item | basename).rstrip('.j2') }}"
+  loop: >-
+    {{ query('fileglob', role_path + '/templates/nginx/conf.d/*.j2') }}
+
+- name: Deploy nginx default configuration
+  template:
+    src: nginx/nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    validate: /etc/nginx/conf_validate.sh %s
+  notify: nginx
+
+- name: "Create {{ webserver_nginx_conf_sites_dir }}"
+  file:
+    path: "{{ webserver_nginx_conf_sites_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Deploy nginx_site_validate.sh helper
+  copy:
+    src: nginx/site_validate.sh
+    dest: /etc/nginx/site_validate.sh
+    mode: 0755
+
+- name: Enable and start nginx
+  service:
+    name: nginx
+    state: started
+    enabled: true

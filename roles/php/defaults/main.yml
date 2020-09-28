@@ -1,0 +1,119 @@
+---
+
+# defaults file for php
+
+# based on https://bit.ly/2R74I03 (github.com/danehrlich1/very-secure-php-ini)
+# see also https://bit.ly/3icZ3Bf (github.com/OWASP/CheatSheetSeries)
+php_disable_functions:
+  - proc_open
+  - popen
+  - disk_free_space
+  - diskfreespace
+  - set_time_limit
+  - leak
+  - tmpfile
+  - exec
+  - system
+  - shell_exec
+  - passthru
+  - show_source
+  - system
+  - phpinfo
+  - pcntl_alarm
+  - pcntl_fork
+  - pcntl_waitpid
+  - pcntl_wait
+  - pcntl_wifexited
+  - pcntl_wifstopped
+  - pcntl_wifsignaled
+  - pcntl_wexitstatus
+  - pcntl_wtermsig
+  - pcntl_wstopsig
+  - pcntl_signal
+  - pcntl_signal_dispatch
+  - pcntl_get_last_error
+  - pcntl_strerror
+  - pcntl_sigprocmask
+  - pcntl_sigwaitinfo
+  - pcntl_sigtimedwait
+  - pcntl_exec
+  - pcntl_getpriority
+  - pcntl_setpriority
+
+php_packages:
+  - php-cli
+  - php-common
+  - php-fpm
+  - php-gd
+  - php-json
+  - php-mbstring
+  - php-mysqlnd
+  - php-pdo
+  - php-xml
+
+# php-fpm options to be put into instantized /etc/sysconfig/php-fpm-%i
+#php_fpm_options: "--allow-to-run-as-root"
+
+# https://prog2017.rmll.info/IMG/pdf/2017-07-05_rmll2017_durcissement_avec_systemd.pdf
+# updated to https://github.com/php/php-src/blob/master/sapi/fpm/php-fpm.service.in
+# if available on system
+php_fpm_service_override: |
+  [ Service ]
+  SystemCallFilter=~chroot
+  SystemCallFilter=~@obsolete
+  SystemCallFilter=~ptrace
+  ProtectHome=tmpfs
+  # php-fpm master src
+  ProtectSystem=full
+  PrivateDevices=true
+  ProtectKernelModules=true
+  ProtectKernelTunables=true
+  ProtectControlGroups=true
+  RestrictRealtime=true
+  RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
+
+# directory with website php-fpm configuration
+php_fpm_sites_conf_dir: /etc/php/sites
+
+# user to use to run php-fpm if not explicitly defined
+php_fpm_user: &php_fpm_user nginx
+php_fpm_group: &php_fpm_group nginx
+# php_fpm_user: apache
+# php_fpm_group: apache
+php_fpm_listen_owner: *php_fpm_user
+php_fpm_listen_group: *php_fpm_group
+php_fpm_listen_mode: "0660"
+
+# resources for php-fpm pm, based on config defaults
+php_fpm_pm: dynamic
+php_fpm_pm_max_children: 50
+php_fpm_pm_start_servers: 5
+php_fpm_pm_min_spare_servers: 5
+php_fpm_pm_max_spare_servers: 35
+php_fpm_pm_process_idle_timeout: "10s"
+
+# note that defining disable_functions or disable_classes will not
+# overwrite previously defined php.ini values, but will append the new
+# value instead
+php_fpm_php_admin_flag: |
+  php_admin_flag[log_errors] = On
+# /tmp is usually generated in namespace by systemd
+php_fpm_php_admin_value: |
+  php_admin_value[upload_tmp_dir] = /tmp
+php_fpm_php_flag: |
+  php_flag[display_errors] = Off
+php_fpm_php_value: |
+  php_value[session.save_handler] = files
+  php_value[session.save_path]    = /var/lib/php/session
+  php_value[soap.wsdl_cache_dir]  = /var/lib/php/wsdlcache
+
+# list of php sites, all 'php_fpm_*' options could be defined per
+# individual php website while left-stripping 'php_fpm_'
+php_websites:
+  - name: test.example.com
+    user: nginx
+    group: nginx
+    listen_owner: nginx
+    listen_group: nginx
+    listen_mode: '0660'
+    pm: dynamic

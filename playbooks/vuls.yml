@@ -1,0 +1,11 @@
+---
+
+- name: Prepare and update Vuls environment
+  hosts: "{{ target | default('app_vuls_server') }}"
+  become: true
+
+  tasks:
+
+    - name: Import role vuls
+      import_role:
+        name: vuls
