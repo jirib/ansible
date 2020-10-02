@@ -19,9 +19,13 @@ Ansible to get data from managed nodes and submit them to Vuls server.
 ### Setup Vuls infrastructure
 
 ```
-$ ansible-playbook -i env/prod playbooks/vuls.yml \
+$ ANSIBLE_DUPLICATE_YAML_DICT_KEY=ignore ansible-playbook playbooks/vuls.yml \
   -e target=localhost -c local -vv
 ```
+
+:: Reason for `ANSIBLE_DUPLICATE_YAML_DICT_KEY=ignore` usage is
+explained at [Prevent duplicate key warnings in Ansible
+2](https://stackoverflow.com/questions/34940352/prevent-duplicate-key-warnings-in-ansible-2)
 
 This would cause to build Vuls infrastructure on control node.
 
@@ -43,9 +47,9 @@ Example of metrics:
 
 ```
 # cat /var/lib/node_exporter/textfile_collector/vuls-foo.example.com.prom 
-vuls_scan_scannedcves{target="foo.examplecom"} 586
-vuls_scan_scannedat{target="foo.examplecom"} 1598256000
-vuls_scan_reportedat{target="foo.examplecom"} 1598259341
+vuls_scan_scannedcves{target="foo.example.com"} 586
+vuls_scan_scannedat{target="foo.example.com"} 1598256000
+vuls_scan_reportedat{target="foo.example.com"} 1598259341
 ```
 The scan itself:
 
